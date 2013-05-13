@@ -83,6 +83,34 @@ function! s:IsDoneState(state)
     return 0
 endfunction
 "1}}}
+" s:GetNotnowStates - Returns a list of all neither done nor to-do states -
+" they should be SOMEDAY or WAIT states {{{1
+function! s:GetNotnowStates()
+    let states = []
+    for group in g:todo_states
+        let idx_undecided = index(group, "?")
+				let idx_done = index(group, "|")
+        if idx_undecided == len(group)
+            continue
+        elseif idx_undecided != -1
+            let idx_undecided = idx_undecided + 1
+        endif
+        if idx_done != -1
+            let idx_done = idx_done - 1
+        endif
+				if idx_undecided < idx_done
+        		for state in group[idx_undecided : idx_done]
+            		call add(states, vimtodo#TodoParseTaskState(state)['state'])
+        		endfor
+				else	
+        		for state in group[idx_undecided :]
+            		call add(states, vimtodo#TodoParseTaskState(state)['state'])
+        		endfor
+				endif
+    endfor
+    return states
+endfunction
+"1}}}
 " s:GetDoneStates - Returns a list of all done states {{{1
 function! s:GetDoneStates()
     let states = []
@@ -574,8 +602,13 @@ function! s:TaskSearch(daterange, ...)
         for pat in a:000
             if match(d.text, pat) == -1
                 let matched = 0
+								"echom d.text "is not match with" pat
             endif
         endfor
+				if matched == 0
+						continue
+				endif
+				"echom d.text matched
         if a:daterange != []
             " Filter by date
             let date = s:ParseDate(matchstr(d.text,
@@ -586,6 +619,9 @@ function! s:TaskSearch(daterange, ...)
             if date > enddate
                 let matched = 0
             endif
+						if date == 0
+								let matched = 1
+						endif
         endif
         if matched
             call add(results, d)
@@ -602,8 +638,9 @@ function! s:ShowDueTasks(start, end)
     " 0 == today, 1 == tomorrow, -1 == yesterday
     " Make start/end the same number for a single say search
     " Generate a regex to exclude all done states
-    let donere = '^\s*\('.join(s:GetDoneStates(), '\|').'\)\@!'
-    call s:TaskSearch([a:start, a:end], donere)
+    let donere = '^\(\s*'.join(s:GetDoneStates(), '\|\s*').'\)\@!'
+    let notnow = '^\(\s*'.join(s:GetNotnowStates(), '\|\s*').'\)\@!'
+    call s:TaskSearch([a:start, a:end], donere, notnow)
 endfunction
 "1}}}
 " ShowDueTasks command definitions {{{1
